@@ -36,7 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    // Ensure Supabase confirmation links come back to this deployed domain.
+    // Without this, the redirect can fall back to a template/dashboard localhost URL.
+    const emailRedirectTo = window.location.origin;
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo },
+    });
     if (error) throw error;
   };
 
