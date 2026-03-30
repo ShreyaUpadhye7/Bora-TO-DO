@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Heart, Sparkles, Star, Coins } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -12,10 +12,20 @@ import {
   getPetStage,
   getOverallMood,
   calculateStatDecay,
-  getXpForLevel,
   type PetStats,
   type PetType,
 } from "@/lib/pet-data";
+
+// XP / growth tuning
+const XP_PER_COMPLETED_TODO = 10; // each newly-completed todo grants this XP
+const COINS_PER_COMPLETED_TODO = 10; // spendable "XP balance" used for feeding/actions
+const HUNGER_LOSS_PER_COMPLETED_TODO = 4;
+const ENERGY_LOSS_PER_COMPLETED_TODO = 5;
+const HAPPINESS_LOSS_PER_COMPLETED_TODO = 2;
+const CLEANLINESS_LOSS_PER_COMPLETED_TODO = 1;
+
+const XP_PER_GROWTH_DAY = 100; // at 100 XP: next "potential day"
+const SIZE_SCALE_PER_DAY = 0.00012; // tiny but visible growth from day 0 -> day 1000
 
 // Pixel pet renderer
 function PixelPet({ pixels, size = 6, animate = false }: { pixels: string[][]; size?: number; animate?: boolean }) {
@@ -107,6 +117,7 @@ export default function PetGardenPage() {
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const prevCompletedRef = useRef<number | null>(null);
 
   // Fetch pet data
   const fetchPet = useCallback(async () => {
@@ -122,15 +133,74 @@ export default function PetGardenPage() {
 
   useEffect(() => { fetchPet(); }, [fetchPet]);
 
-  // Grant coins from completed tasks (1 coin per 2 completed tasks as bonus)
+  // Award XP + spendable "XP balance" when the user completes new todos,
+  // and also make the pet lose some stats because the user is doing work.
   useEffect(() => {
     if (!petData || !user) return;
-    const bonusCoins = Math.floor(totalCompleted / 2);
-    const currentCoins = petData.coins || 0;
-    if (bonusCoins > currentCoins && totalCompleted > 0) {
-      supabase.from("virtual_pets").update({ coins: bonusCoins, xp: petData.xp + 5 }).eq("user_id", user.id).then(() => fetchPet());
+
+    // Initialize reference on first load so we only process "newly completed" tasks.
+    if (prevCompletedRef.current === null) {
+      prevCompletedRef.current = totalCompleted;
+      return;
     }
+
+    const newlyCompleted = totalCompleted - prevCompletedRef.current;
+    if (newlyCompleted <= 0) return;
+
+    const nowIso = new Date().toISOString();
+
+    const xpGain = newlyCompleted * XP_PER_COMPLETED_TODO;
+    const coinsGain = newlyCompleted * COINS_PER_COMPLETED_TODO;
+
+    const hunger = Math.max(0, (petData.hunger || 0) - newlyCompleted * HUNGER_LOSS_PER_COMPLETED_TODO);
+    const energy = Math.max(0, (petData.energy || 0) - newlyCompleted * ENERGY_LOSS_PER_COMPLETED_TODO);
+    const happiness = Math.max(0, (petData.happiness || 0) - newlyCompleted * HAPPINESS_LOSS_PER_COMPLETED_TODO);
+    const cleanliness = Math.max(0, (petData.cleanliness || 0) - newlyCompleted * CLEANLINESS_LOSS_PER_COMPLETED_TODO);
+
+    supabase
+      .from("virtual_pets")
+      .update({
+        xp: (petData.xp || 0) + xpGain,
+        coins: (petData.coins || 0) + coinsGain,
+        hunger,
+        energy,
+        happiness,
+        cleanliness,
+        // Reset "last_*" times so we don't immediately double-decay from time.
+        last_fed: nowIso,
+        last_slept: nowIso,
+        last_played: nowIso,
+        last_cleaned: nowIso,
+      })
+      .eq("user_id", user.id)
+      .then(() => fetchPet());
+
+    prevCompletedRef.current = totalCompleted;
   }, [totalCompleted, petData, user, fetchPet]);
+
+  // Grow the pet when it has filled all stats AND the XP is enough for the next "day".
+  useEffect(() => {
+    if (!petData || !user) return;
+    const hunger = petData.hunger || 0;
+    const happiness = petData.happiness || 0;
+    const cleanliness = petData.cleanliness || 0;
+    const energy = petData.energy || 0;
+
+    const allStatsMaxed = hunger >= 100 && happiness >= 100 && cleanliness >= 100 && energy >= 100;
+    if (!allStatsMaxed) return;
+
+    // petData.level is stored as (achievedDays + 1). So achievedDays=0 => level=1.
+    const achievedDays = Math.max(0, (petData.level || 1) - 1);
+    const potentialDays = Math.floor((petData.xp || 0) / XP_PER_GROWTH_DAY);
+
+    if (potentialDays > achievedDays) {
+      supabase
+        .from("virtual_pets")
+        .update({ level: potentialDays + 1 })
+        .eq("user_id", user.id)
+        .then(() => fetchPet());
+    }
+  }, [petData?.hunger, petData?.happiness, petData?.cleanliness, petData?.energy, petData?.xp, petData?.level, user, fetchPet]);
 
   // Apply stat decay
   useEffect(() => {
@@ -159,6 +229,11 @@ export default function PetGardenPage() {
       user_id: user.id,
       pet_type: selectedPetType,
       pet_name: petName || PET_TYPES.find(p => p.id === selectedPetType)!.name,
+      // Start as "day 0 old": virtual_pets.level is stored as (achievedDays + 1)
+      level: 1,
+      // Spendable XP balance starts at 0; earning XP happens from completed todos.
+      coins: 0,
+      xp: 0,
     });
     fetchPet();
   };
@@ -169,7 +244,7 @@ export default function PetGardenPage() {
     const action = PET_ACTIONS.find(a => a.id === actionId);
     if (!action) return;
     if (petData.coins < action.cost) {
-      setActionFeedback("Not enough coins! Complete more tasks 💜");
+      setActionFeedback("Not enough XP! Complete more tasks 💜");
       setTimeout(() => setActionFeedback(null), 2000);
       return;
     }
@@ -180,10 +255,6 @@ export default function PetGardenPage() {
     }
 
     const newVal = Math.min(100, (petData[action.stat] || 0) + action.amount);
-    const xpGain = 5;
-    const newXp = petData.xp + xpGain;
-    const xpNeeded = getXpForLevel(petData.level);
-    const levelUp = newXp >= xpNeeded;
 
     const timeField = actionId === 'feed' ? 'last_fed'
       : actionId === 'clean' ? 'last_cleaned'
@@ -193,25 +264,28 @@ export default function PetGardenPage() {
     await supabase.from("virtual_pets").update({
       [action.stat]: newVal,
       coins: petData.coins - action.cost,
-      xp: levelUp ? newXp - xpNeeded : newXp,
-      level: levelUp ? petData.level + 1 : petData.level,
       [timeField]: new Date().toISOString(),
     }).eq("user_id", user.id);
 
     setCooldowns(prev => ({ ...prev, [actionId]: Date.now() + action.cooldownMs }));
-    setActionFeedback(levelUp ? "🎉 LEVEL UP! 🎉" : `${action.emoji} ${action.label}! +${action.amount} ${action.stat}`);
+    setActionFeedback(`${action.emoji} ${action.label}! +${action.amount} ${action.stat}`);
     setTimeout(() => setActionFeedback(null), 2000);
     fetchPet();
   };
 
   const currentPetType = PET_TYPES.find(p => p.id === petData?.pet_type);
+  const achievedDays = petData ? Math.max(0, (petData.level || 1) - 1) : 0;
   const stats: PetStats | null = petData ? {
     hunger: petData.hunger, happiness: petData.happiness,
     cleanliness: petData.cleanliness, energy: petData.energy,
-    xp: petData.xp, level: petData.level, coins: petData.coins,
+    xp: petData.xp, level: achievedDays, coins: petData.coins,
   } : null;
   const mood = stats ? getOverallMood(stats) : null;
-  const stage = currentPetType && stats ? getPetStage(currentPetType, stats.level) : null;
+  const stage = currentPetType && stats ? getPetStage(currentPetType, achievedDays) : null;
+  const petScale = 1 + Math.min(0.25, achievedDays * SIZE_SCALE_PER_DAY);
+  const pixelSize = Math.max(6, Math.round(8 * petScale));
+  const xpIntoGrowthDay = (stats?.xp || 0) % XP_PER_GROWTH_DAY;
+  const growthProgress = (xpIntoGrowthDay / XP_PER_GROWTH_DAY) * 100;
 
   if (loading) return <div className="min-h-screen bg-main-gradient flex items-center justify-center"><span className="text-2xl animate-pulse">🐾</span></div>;
 
@@ -277,8 +351,8 @@ export default function PetGardenPage() {
             <ArrowLeft className="w-4 h-4" /> Back
           </button>
           <div className="flex items-center gap-2 glass-card rounded-full px-3 py-1">
-            <Coins className="w-3 h-3 text-yellow-400" />
-            <span className="text-xs font-body font-semibold text-foreground">{stats?.coins || 0}</span>
+              <Sparkles className="w-3 h-3 text-yellow-400" />
+              <span className="text-xs font-body font-semibold text-foreground">{stats?.coins || 0}</span>
           </div>
         </div>
       </div>
@@ -289,14 +363,16 @@ export default function PetGardenPage() {
         <div className="flex items-center justify-center gap-2 mt-1">
           <Star className="w-3 h-3 text-primary" />
           <span className="text-xs font-body text-muted-foreground">
-            Lv.{stats?.level} {stage?.name} • {currentPetType?.member}
+            Day {achievedDays} • {stage?.name} • {currentPetType?.member}
           </span>
           <Star className="w-3 h-3 text-primary" />
         </div>
         {/* XP bar */}
         <div className="max-w-[200px] mx-auto mt-2">
-          <Progress value={stats ? (stats.xp / getXpForLevel(stats.level)) * 100 : 0} className="h-1.5" />
-          <span className="text-[10px] font-body text-muted-foreground">{stats?.xp}/{stats ? getXpForLevel(stats.level) : 0} XP</span>
+          <Progress value={growthProgress} className="h-1.5" />
+          <span className="text-[10px] font-body text-muted-foreground">
+            {xpIntoGrowthDay}/{XP_PER_GROWTH_DAY} XP
+          </span>
         </div>
       </div>
 
@@ -304,7 +380,7 @@ export default function PetGardenPage() {
       <div className="max-w-md mx-auto mb-4">
         <PetRoom mood={mood?.label || "Okay"}>
           <div className="relative z-10 flex flex-col items-center">
-            {stage && <PixelPet pixels={stage.pixels} size={8} animate />}
+            {stage && <PixelPet pixels={stage.pixels} size={pixelSize} animate />}
             {mood && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -371,7 +447,7 @@ export default function PetGardenPage() {
 
       {/* Tip */}
       <p className="text-center text-[10px] font-body text-muted-foreground mt-4 max-w-md mx-auto">
-        💡 Complete tasks to earn coins & XP! Your pet evolves at Level 5 and Level 10.
+        💡 Complete todos to earn XP. Fill all stats (100/100) to grow to the next day. Next stages hit around day 5 and day 10.
       </p>
     </div>
   );
