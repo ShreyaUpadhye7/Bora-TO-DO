@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd .vscode && npm run build",
+  "outputDirectory": ".vscode/dist",
+  "installCommand": "cd .vscode && npm install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

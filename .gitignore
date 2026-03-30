@@ -1,0 +1,14 @@
+.vercel
+
+# Vercel / build outputs
+.vscode/dist
+
+# Dependencies
+.vscode/node_modules/
+
+# Secrets / local env
+.vscode/.env
+.vscode/*.env
+
+# Build caches
+*.tsbuildinfo
