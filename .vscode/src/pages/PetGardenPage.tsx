@@ -270,13 +270,16 @@ export default function PetGardenPage() {
   // Main pet view
   return (
     <div className="min-h-screen bg-main-gradient px-4 pt-6 pb-28">
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-muted-foreground">
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
-        <div className="flex items-center gap-2 glass-card rounded-full px-3 py-1">
-          <Coins className="w-3 h-3 text-yellow-400" />
-          <span className="text-xs font-body font-semibold text-foreground">{stats?.coins || 0}</span>
+      {/* Keep header aligned with the rest of the centered pet UI */}
+      <div className="max-w-md mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-muted-foreground">
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
+          <div className="flex items-center gap-2 glass-card rounded-full px-3 py-1">
+            <Coins className="w-3 h-3 text-yellow-400" />
+            <span className="text-xs font-body font-semibold text-foreground">{stats?.coins || 0}</span>
+          </div>
         </div>
       </div>
 
