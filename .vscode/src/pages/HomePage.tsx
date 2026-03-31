@@ -36,7 +36,7 @@ const HomePage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-main-gradient flex flex-col px-4 pt-5 pb-6 max-w-lg mx-auto">
+    <div className="min-h-screen bg-main-gradient flex flex-col px-6 pt-5 pb-6 max-w-5xl mx-auto w-full">
 
       {/* Header */}
       <motion.div
@@ -71,7 +71,7 @@ const HomePage = () => {
       </motion.div>
 
       {/* Bento grid */}
-      <div className="grid grid-cols-2 gap-3 flex-1">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
 
         {/* Tasks — large, spans 2 rows */}
         <motion.button
@@ -81,8 +81,7 @@ const HomePage = () => {
           whileHover={{ y: -3, scale: 1.015 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => navigate("/todos")}
-          className="glass-card rounded-2xl p-5 text-left cursor-pointer group relative overflow-hidden row-span-2 flex flex-col justify-between"
-        >
+          className="glass-card rounded-2xl p-5 text-left cursor-pointer group relative overflow-hidden row-span-2 flex flex-col justify-between"        >
           <div>
             <span className="text-3xl block mb-3 group-hover:scale-110 transition-transform duration-200">💜</span>
             <h2 className="text-lg font-display font-semibold text-foreground mb-1">Tasks</h2>
@@ -157,7 +156,7 @@ const HomePage = () => {
           whileHover={{ y: -3, scale: 1.015 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => navigate("/magic-shop")}
-          className="glass-card rounded-2xl px-5 py-4 text-left cursor-pointer group col-span-2 flex items-center gap-4 relative overflow-hidden"
+          className="glass-card rounded-2xl px-5 py-4 text-left cursor-pointer group col-span-2 sm:col-span-4 flex items-center gap-4 relative overflow-hidden"
           style={hasNewUnlock ? { boxShadow: "0 0 24px hsl(275 55% 65% / 0.2)" } : {}}
         >
           <motion.div animate={hasNewUnlock ? { opacity: [0.6, 1, 0.6] } : {}} transition={{ duration: 2, repeat: Infinity }}>
