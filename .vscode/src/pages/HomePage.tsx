@@ -63,16 +63,20 @@ const navCards = [
     path: "/gratitude",
     emoji: "🫙",
   },
+  {
+    title: "Magic Shop",
+    description: "Unlock rewards",
+    icon: KeyRound,
+    path: "/magic-shop",
+    emoji: "🗝️",
+  },
 ];
-
-const MILESTONES = [5, 10, 20, 35, 50];
 
 const HomePage = () => {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { allTodos } = useTodos();
   const totalCompleted = allTodos.filter((t) => t.completed).length;
-  const hasNewUnlock = MILESTONES.some((m) => totalCompleted >= m && totalCompleted < m + 3);
 
   return (
     <div className="min-h-screen bg-main-gradient flex flex-col items-center justify-center px-4 pb-24 relative">
@@ -155,24 +159,6 @@ const HomePage = () => {
           </motion.button>
         ))}
       </div>
-
-      {/* Magic Shop Floating Key */}
-      <motion.button
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.8, type: "spring" }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => navigate("/magic-shop")}
-        className="mt-8 glass-card rounded-2xl px-5 py-3 flex items-center gap-3 cursor-pointer"
-        style={hasNewUnlock ? { boxShadow: "0 0 20px hsl(275 55% 65% / 0.25), 0 0 40px hsl(275 55% 65% / 0.1)" } : {}}
-      >
-        <motion.div animate={hasNewUnlock ? { opacity: [0.6, 1, 0.6] } : {}} transition={{ duration: 2, repeat: Infinity }}>
-          <KeyRound className={`w-5 h-5 ${hasNewUnlock ? "text-primary" : "text-muted-foreground"}`} />
-        </motion.div>
-        <span className="text-sm font-body font-medium text-foreground">Magic Shop</span>
-        {hasNewUnlock && <span className="text-xs text-primary font-body">✨ New!</span>}
-      </motion.button>
     </div>
   );
 };
