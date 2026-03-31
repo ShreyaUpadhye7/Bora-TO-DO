@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckSquare, BookOpen, Timer, Sparkles, CalendarDays, KeyRound, Gamepad2, Palette, PawPrint } from "lucide-react";
+import { CheckSquare, BookOpen, Timer, Sparkles, CalendarDays, KeyRound, Gamepad2, Palette, PawPrint, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTodos } from "@/hooks/useTodos";
@@ -55,6 +55,13 @@ const navCards = [
     icon: PawPrint,
     path: "/pet",
     emoji: "🐾",
+  },
+  {
+    title: "Gratitude Jar",
+    description: "Seal your gratitude",
+    icon: Heart,
+    path: "/gratitude",
+    emoji: "🫙",
   },
 ];
 
