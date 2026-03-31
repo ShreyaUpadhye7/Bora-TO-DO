@@ -29,7 +29,13 @@ export default function TodoItem({ todo, onToggle, onDelete, onEdit, showDetails
     setEditing(false);
   };
 
-  const isOverdue = todo.dueDate && !todo.completed && new Date(todo.dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
+  const isOverdue = todo.dueDate && !todo.completed && (() => {
+    const [y, m, d] = todo.dueDate.split("-").map(Number);
+    const due = new Date(y, m - 1, d);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return due < today;
+  })();
 
   return (
     <>

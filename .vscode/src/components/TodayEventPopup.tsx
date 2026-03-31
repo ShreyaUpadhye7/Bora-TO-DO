@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, X } from "lucide-react";
 import { isToday } from "date-fns";
@@ -8,12 +8,14 @@ export default function TodayEventPopup() {
   const { events, markNotified } = useEvents();
   const [visible, setVisible] = useState(false);
   const [todayEvents, setTodayEvents] = useState<AppEvent[]>([]);
+  const shownIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unnotified = events.filter(
-      (e) => isToday(new Date(e.event_date)) && !e.is_notified
+      (e) => isToday(new Date(e.event_date)) && !e.is_notified && !shownIdsRef.current.has(e.id)
     );
     if (unnotified.length > 0) {
+      unnotified.forEach(e => shownIdsRef.current.add(e.id));
       setTodayEvents(unnotified);
       setVisible(true);
     }

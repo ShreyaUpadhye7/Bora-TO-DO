@@ -178,18 +178,9 @@ export default function PetGardenPage() {
     prevCompletedRef.current = totalCompleted;
   }, [totalCompleted, petData, user, fetchPet]);
 
-  // Grow the pet when it has filled all stats AND the XP is enough for the next "day".
+  // Grow the pet when XP is enough for the next level, regardless of stats.
   useEffect(() => {
     if (!petData || !user) return;
-    const hunger = petData.hunger || 0;
-    const happiness = petData.happiness || 0;
-    const cleanliness = petData.cleanliness || 0;
-    const energy = petData.energy || 0;
-
-    const allStatsMaxed = hunger >= 100 && happiness >= 100 && cleanliness >= 100 && energy >= 100;
-    if (!allStatsMaxed) return;
-
-    // petData.level is stored as (achievedDays + 1). So achievedDays=0 => level=1.
     const achievedDays = Math.max(0, (petData.level || 1) - 1);
     const potentialDays = Math.floor((petData.xp || 0) / XP_PER_GROWTH_DAY);
 
@@ -200,27 +191,34 @@ export default function PetGardenPage() {
         .eq("user_id", user.id)
         .then(() => fetchPet());
     }
-  }, [petData?.hunger, petData?.happiness, petData?.cleanliness, petData?.energy, petData?.xp, petData?.level, user, fetchPet]);
+  }, [petData?.xp, petData?.level, user, fetchPet]);
 
-  // Apply stat decay
+  // Apply stat decay on a periodic interval (every 5 minutes)
   useEffect(() => {
     if (!petData || !user) return;
-    const decays = {
-      hunger: calculateStatDecay(petData.last_fed),
-      happiness: calculateStatDecay(petData.last_played),
-      cleanliness: calculateStatDecay(petData.last_cleaned),
-      energy: calculateStatDecay(petData.last_slept),
+
+    const applyDecay = () => {
+      const decays = {
+        hunger: calculateStatDecay(petData.last_fed),
+        happiness: calculateStatDecay(petData.last_played),
+        cleanliness: calculateStatDecay(petData.last_cleaned),
+        energy: calculateStatDecay(petData.last_slept),
+      };
+      const needsUpdate = Object.values(decays).some(d => d > 5);
+      if (needsUpdate) {
+        supabase.from("virtual_pets").update({
+          hunger: Math.max(0, petData.hunger - decays.hunger),
+          happiness: Math.max(0, petData.happiness - decays.happiness),
+          cleanliness: Math.max(0, petData.cleanliness - decays.cleanliness),
+          energy: Math.max(0, petData.energy - decays.energy),
+        }).eq("user_id", user.id).then(() => fetchPet());
+      }
     };
-    const needsUpdate = Object.values(decays).some(d => d > 5);
-    if (needsUpdate) {
-      supabase.from("virtual_pets").update({
-        hunger: Math.max(0, petData.hunger - decays.hunger),
-        happiness: Math.max(0, petData.happiness - decays.happiness),
-        cleanliness: Math.max(0, petData.cleanliness - decays.cleanliness),
-        energy: Math.max(0, petData.energy - decays.energy),
-      }).eq("user_id", user.id).then(() => fetchPet());
-    }
-  }, [petData?.id]);
+
+    applyDecay(); // run immediately on load
+    const interval = setInterval(applyDecay, 5 * 60 * 1000); // then every 5 minutes
+    return () => clearInterval(interval);
+  }, [petData?.id, user]);
 
   // Create pet
   const createPet = async () => {
@@ -268,6 +266,9 @@ export default function PetGardenPage() {
     }).eq("user_id", user.id);
 
     setCooldowns(prev => ({ ...prev, [actionId]: Date.now() + action.cooldownMs }));
+    setTimeout(() => {
+      setCooldowns(prev => { const next = { ...prev }; delete next[actionId]; return next; });
+    }, action.cooldownMs);
     setActionFeedback(`${action.emoji} ${action.label}! +${action.amount} ${action.stat}`);
     setTimeout(() => setActionFeedback(null), 2000);
     fetchPet();

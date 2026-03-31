@@ -9,12 +9,31 @@ type TimerMode = "focus" | "break";
 
 const FOCUS_MINUTES = 25;
 const BREAK_MINUTES = 5;
+const STORAGE_KEY = "focus-timer-state";
+
+function loadTimerState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return null;
+    const { mode, secondsLeft, savedAt, running } = JSON.parse(saved);
+    // If it was running, subtract elapsed time since save
+    if (running) {
+      const elapsed = Math.floor((Date.now() - savedAt) / 1000);
+      const adjusted = Math.max(0, secondsLeft - elapsed);
+      return { mode, secondsLeft: adjusted, running: adjusted > 0 };
+    }
+    return { mode, secondsLeft, running: false };
+  } catch {
+    return null;
+  }
+}
 
 const FocusPage = () => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<TimerMode>("focus");
-  const [secondsLeft, setSecondsLeft] = useState(FOCUS_MINUTES * 60);
-  const [running, setRunning] = useState(false);
+  const saved = loadTimerState();
+  const [mode, setMode] = useState<TimerMode>(saved?.mode ?? "focus");
+  const [secondsLeft, setSecondsLeft] = useState(saved?.secondsLeft ?? FOCUS_MINUTES * 60);
+  const [running, setRunning] = useState(saved?.running ?? false);
   const [activeSound, setActiveSound] = useState<AmbientType | null>(null);
   const [volume, setVolume] = useState(0.3);
   const [sessionsCompleted, setSessionsCompleted] = useState(0);
@@ -75,6 +94,11 @@ const FocusPage = () => {
   };
 
   useEffect(() => () => ambientEngine.stop(), []);
+
+  // Persist timer state to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode, secondsLeft, running, savedAt: Date.now() }));
+  }, [mode, secondsLeft, running]);
 
   return (
     <div className="min-h-screen bg-main-gradient relative overflow-hidden">

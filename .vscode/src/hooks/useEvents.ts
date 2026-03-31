@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/client";
 import { useAuth } from "./useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 export interface AppEvent {
   id: string;
@@ -16,6 +17,7 @@ export interface AppEvent {
 export function useEvents() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const eventsQuery = useQuery({
     queryKey: ["events", user?.id],
@@ -40,6 +42,7 @@ export function useEvents() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
+    onError: () => toast({ title: "Failed to add event", variant: "destructive" }),
   });
 
   const deleteEvent = useMutation({
@@ -48,6 +51,7 @@ export function useEvents() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
+    onError: () => toast({ title: "Failed to delete event", variant: "destructive" }),
   });
 
   const markNotified = useMutation({
@@ -56,6 +60,7 @@ export function useEvents() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
+    onError: () => toast({ title: "Failed to update notification", variant: "destructive" }),
   });
 
   return { events: eventsQuery.data ?? [], isLoading: eventsQuery.isLoading, addEvent, deleteEvent, markNotified };

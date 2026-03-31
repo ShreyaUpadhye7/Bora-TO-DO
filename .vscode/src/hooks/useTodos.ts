@@ -4,8 +4,8 @@ import { classifyTodo } from "@/lib/bts-classifier";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/client";
 
-function isToday(dateStr: string) {
-  const d = new Date(dateStr);
+function isToday(timestamp: number) {
+  const d = new Date(timestamp);
   const now = new Date();
   return (
     d.getFullYear() === now.getFullYear() &&
@@ -54,13 +54,13 @@ export function useTodos() {
 
   // Today's todos
   const todayTodos = useMemo(
-    () => allTodos.filter((t) => isToday(new Date(t.createdAt).toISOString())),
+    () => allTodos.filter((t) => isToday(t.createdAt)),
     [allTodos]
   );
 
   // Past incomplete todos (tasks left undone)
   const undoneTodos = useMemo(
-    () => allTodos.filter((t) => !isToday(new Date(t.createdAt).toISOString()) && !t.completed),
+    () => allTodos.filter((t) => !isToday(t.createdAt) && !t.completed),
     [allTodos]
   );
 
