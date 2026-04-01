@@ -28,12 +28,12 @@ interface Note {
 }
 
 const NOTE_COLORS = [
-  { id: "default", bg: "hsl(275 30% 12%)", border: "hsl(275 30% 25%)" },
-  { id: "purple",  bg: "hsl(275 40% 14%)", border: "hsl(275 55% 40%)" },
-  { id: "blue",    bg: "hsl(220 40% 14%)", border: "hsl(220 55% 40%)" },
-  { id: "green",   bg: "hsl(160 35% 13%)", border: "hsl(160 50% 38%)" },
-  { id: "pink",    bg: "hsl(330 40% 14%)", border: "hsl(330 55% 45%)" },
-  { id: "amber",   bg: "hsl(40 40% 13%)",  border: "hsl(40 70% 45%)"  },
+  { id: "default", bg: "linear-gradient(135deg, hsl(275 40% 92% / 0.12), hsl(200 50% 90% / 0.08))", border: "hsl(275 40% 75% / 0.3)" },
+  { id: "purple",  bg: "linear-gradient(135deg, hsl(275 60% 90% / 0.14), hsl(330 50% 88% / 0.08))", border: "hsl(275 60% 70% / 0.35)" },
+  { id: "blue",    bg: "linear-gradient(135deg, hsl(220 60% 90% / 0.14), hsl(200 60% 88% / 0.08))", border: "hsl(220 60% 70% / 0.35)" },
+  { id: "green",   bg: "linear-gradient(135deg, hsl(160 50% 88% / 0.12), hsl(200 50% 88% / 0.08))", border: "hsl(160 50% 65% / 0.3)"  },
+  { id: "pink",    bg: "linear-gradient(135deg, hsl(330 55% 90% / 0.14), hsl(275 50% 88% / 0.08))", border: "hsl(330 55% 70% / 0.35)" },
+  { id: "amber",   bg: "linear-gradient(135deg, hsl(40 70% 90% / 0.12), hsl(330 50% 88% / 0.08))",  border: "hsl(40 70% 65% / 0.3)"  },
 ];
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -196,17 +196,29 @@ export default function NotesPage() {
                     return (
                       <motion.button key={note.id}
                         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                        whileHover={{ y: -4, scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                        whileHover={{ y: -6, scale: 1.03, boxShadow: `0 12px 40px ${col.border}` }}
+                        whileTap={{ scale: 0.97 }}
                         onClick={() => setOpenNote(note)}
-                        className="relative text-left rounded-2xl p-4 group"
-                        style={{ background: col.bg, border: `1px solid ${col.border}` }}>
-                        <p className="text-sm font-display font-semibold text-foreground mb-1 truncate">{note.title || "Untitled"}</p>
-                        <p className="text-xs font-body text-muted-foreground line-clamp-3 leading-relaxed">{preview || "Empty note"}</p>
-                        <p className="text-[10px] font-body text-muted-foreground/50 mt-2">
+                        className="relative text-left rounded-2xl p-4 group overflow-hidden"
+                        style={{
+                          background: col.bg,
+                          border: `1px solid ${col.border}`,
+                          boxShadow: `0 4px 24px ${col.border.replace("0.3", "0.15")}, inset 0 1px 0 rgba(255,255,255,0.12)`,
+                          backdropFilter: "blur(12px)",
+                        }}>
+                        {/* Iridescent shimmer overlay */}
+                        <div className="absolute inset-0 rounded-2xl pointer-events-none"
+                          style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 50%, rgba(255,255,255,0.04) 100%)" }} />
+                        {/* Bubble highlight top-left */}
+                        <div className="absolute top-2 left-3 w-8 h-3 rounded-full pointer-events-none"
+                          style={{ background: "rgba(255,255,255,0.15)", filter: "blur(4px)" }} />
+                        <p className="text-sm font-display font-semibold text-foreground mb-1 truncate relative z-10">{note.title || "Untitled"}</p>
+                        <p className="text-xs font-body text-foreground/60 line-clamp-3 leading-relaxed relative z-10">{preview || "Empty note"}</p>
+                        <p className="text-[10px] font-body text-foreground/30 mt-2 relative z-10">
                           {new Date(note.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </p>
                         <button onClick={e => { e.stopPropagation(); deleteNote(note.id); }}
-                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all">
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all z-10">
                           <X className="w-3 h-3" />
                         </button>
                       </motion.button>
@@ -226,7 +238,7 @@ export default function NotesPage() {
                 {NOTE_COLORS.map(col => (
                   <button key={col.id} onClick={() => setOpenNote({ ...openNote, color: col.id })}
                     className={`w-6 h-6 rounded-full transition-transform ${openNote.color === col.id ? "scale-125 ring-2 ring-white/40" : "hover:scale-110"}`}
-                    style={{ background: col.border }} />
+                    style={{ background: col.border, boxShadow: `0 2px 8px ${col.border}` }} />
                 ))}
               </div>
 
