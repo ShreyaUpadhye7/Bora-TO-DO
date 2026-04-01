@@ -12,6 +12,9 @@ export interface AppEvent {
   category: string;
   is_notified: boolean;
   created_at: string;
+  event_type: "task" | "event" | "reminder";
+  is_all_day: boolean;
+  reminder_offset: string | null; // '1h' | '1d' | '1w' | '1m' | null
 }
 
 export function useEvents() {
@@ -34,11 +37,11 @@ export function useEvents() {
   });
 
   const addEvent = useMutation({
-    mutationFn: async (evt: { title: string; description: string; event_date: string; category: string }) => {
-      const { error } = await supabase.from("events").insert({
-        ...evt,
-        user_id: user!.id,
-      });
+    mutationFn: async (evt: {
+      title: string; description: string; event_date: string; category: string;
+      event_type?: string; is_all_day?: boolean; reminder_offset?: string | null;
+    }) => {
+      const { error } = await supabase.from("events").insert({ ...evt, user_id: user!.id });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),

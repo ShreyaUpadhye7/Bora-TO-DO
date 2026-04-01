@@ -43,6 +43,9 @@ const CalendarPage = () => {
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("12:00");
   const [description, setDescription] = useState("");
+  const [eventType, setEventType] = useState<"task" | "event" | "reminder">("event");
+  const [isAllDay, setIsAllDay] = useState(false);
+  const [reminderOffset, setReminderOffset] = useState<string>("");
 
   // countdown
   const [showCountdown, setShowCountdown] = useState(false);
@@ -84,17 +87,25 @@ const CalendarPage = () => {
   const handleAddEvent = async () => {
     if (!title.trim()) return;
     const eventDate = new Date(selectedDate);
-    const [h, m] = time.split(":").map(Number);
-    eventDate.setHours(h, m, 0, 0);
+    if (!isAllDay) {
+      const [h, m] = time.split(":").map(Number);
+      eventDate.setHours(h, m, 0, 0);
+    } else {
+      eventDate.setHours(0, 0, 0, 0);
+    }
     try {
       await addEvent.mutateAsync({
         title: title.trim(), description: description.trim(),
         event_date: eventDate.toISOString(), category: "personal",
+        event_type: eventType, is_all_day: isAllDay,
+        reminder_offset: reminderOffset || null,
       });
-      toast({ title: "Event added! 💜" });
-      setTitle(""); setTime("12:00"); setDescription(""); setShowAddForm(false);
+      toast({ title: "Added! 💜" });
+      setTitle(""); setTime("12:00"); setDescription("");
+      setEventType("event"); setIsAllDay(false); setReminderOffset("");
+      setShowAddForm(false);
     } catch {
-      toast({ title: "Failed to add event", variant: "destructive" });
+      toast({ title: "Failed to add", variant: "destructive" });
     }
   };
 
@@ -304,10 +315,45 @@ const CalendarPage = () => {
                     exit={{ opacity: 0, height: 0 }} className="overflow-hidden mb-4">
                     <div className="glass-card rounded-2xl p-4 space-y-3">
                       <input value={title} onChange={e => setTitle(e.target.value)}
-                        placeholder="Event title"
+                        placeholder="Title"
                         className="w-full glass-input rounded-xl px-4 py-2.5 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
-                      <input type="time" value={time} onChange={e => setTime(e.target.value)}
-                        className="w-full glass-input rounded-xl px-4 py-2.5 text-sm font-body text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+
+                      {/* Type selector */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {(["task", "event", "reminder"] as const).map(t => (
+                          <button key={t} onClick={() => setEventType(t)}
+                            className={`py-2 rounded-xl text-xs font-body font-semibold capitalize transition-all ${eventType === t ? "text-primary-foreground" : "glass-card text-muted-foreground"}`}
+                            style={eventType === t ? { background: t === "task" ? "hsl(275 55% 55%)" : t === "event" ? "hsl(220 55% 55%)" : "hsl(30 80% 55%)" } : {}}>
+                            {t === "task" ? "📋 Task" : t === "event" ? "📅 Event" : "🔔 Reminder"}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* All day toggle */}
+                      <div className="flex items-center justify-between glass-input rounded-xl px-4 py-2.5">
+                        <span className="text-sm font-body text-foreground">All day</span>
+                        <button onClick={() => setIsAllDay(v => !v)}
+                          className={`w-10 h-5 rounded-full transition-colors relative ${isAllDay ? "bg-primary" : "bg-secondary"}`}>
+                          <motion.div animate={{ x: isAllDay ? 20 : 2 }} transition={{ type: "spring", stiffness: 400 }}
+                            className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow" />
+                        </button>
+                      </div>
+
+                      {!isAllDay && (
+                        <input type="time" value={time} onChange={e => setTime(e.target.value)}
+                          className="w-full glass-input rounded-xl px-4 py-2.5 text-sm font-body text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                      )}
+
+                      {/* Reminder */}
+                      <select value={reminderOffset} onChange={e => setReminderOffset(e.target.value)}
+                        className="w-full glass-input rounded-xl px-4 py-2.5 text-sm font-body text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 bg-transparent">
+                        <option value="">No reminder</option>
+                        <option value="1h">1 hour before</option>
+                        <option value="1d">1 day before</option>
+                        <option value="1w">1 week before</option>
+                        <option value="1m">1 month before</option>
+                      </select>
+
                       <textarea value={description} onChange={e => setDescription(e.target.value)}
                         placeholder="Description (optional)" rows={2}
                         className="w-full glass-input rounded-xl px-4 py-2.5 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
@@ -316,7 +362,7 @@ const CalendarPage = () => {
                           onClick={handleAddEvent} disabled={!title.trim() || addEvent.isPending}
                           className="flex-1 py-2.5 rounded-xl text-primary-foreground font-body font-semibold text-sm disabled:opacity-40"
                           style={{ background: "var(--gradient-accent)" }}>
-                          {addEvent.isPending ? "Adding..." : "Add Event 💜"}
+                          {addEvent.isPending ? "Adding..." : "Add 💜"}
                         </motion.button>
                         <button onClick={() => setShowAddForm(false)}
                           className="px-4 py-2.5 rounded-xl glass-card text-muted-foreground hover:text-foreground transition-colors">
@@ -328,10 +374,31 @@ const CalendarPage = () => {
                 )}
               </AnimatePresence>
 
+              {/* All-day events */}
+              {dayEvents.filter(e => e.is_all_day).length > 0 && (
+                <div className="glass-card rounded-xl px-4 py-2 mb-3 space-y-1">
+                  <p className="text-[10px] font-body font-semibold uppercase tracking-widest text-muted-foreground mb-1">All Day</p>
+                  {dayEvents.filter(e => e.is_all_day).map(evt => (
+                    <div key={evt.id} className="flex items-center justify-between rounded-lg px-3 py-1.5 group"
+                      style={{
+                        background: evt.event_type === "task" ? "hsl(275 55% 55% / 0.15)" : evt.event_type === "reminder" ? "hsl(30 80% 55% / 0.15)" : "hsl(220 55% 55% / 0.15)",
+                        borderLeft: `3px solid ${evt.event_type === "task" ? "hsl(275 55% 55%)" : evt.event_type === "reminder" ? "hsl(30 80% 55%)" : "hsl(220 55% 55%)"}`,
+                      }}>
+                      <span className="text-xs font-body font-semibold text-foreground">{evt.title}</span>
+                      <motion.button whileHover={{ scale: 1.2 }} whileTap={{ scale: 0.8 }}
+                        onClick={() => handleDelete(evt.id)}
+                        className="opacity-0 group-hover:opacity-100 text-destructive/60 hover:text-destructive p-1 transition-opacity">
+                        <Trash2 className="w-3 h-3" />
+                      </motion.button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* 24-hour timeline */}
               <div ref={dayScrollRef} className="glass-card rounded-2xl overflow-y-auto" style={{ maxHeight: "60vh" }}>
                 {HOURS.map(hour => {
-                  const hourEvents = dayEvents.filter(e => new Date(e.event_date).getHours() === hour);
+                  const hourEvents = dayEvents.filter(e => !e.is_all_day && new Date(e.event_date).getHours() === hour);
                   const isCurrentHour = isToday(selectedDate) && new Date().getHours() === hour;
                   return (
                     <div key={hour} className={`flex gap-3 px-4 border-b border-border/20 min-h-[56px] ${isCurrentHour ? "bg-primary/5" : ""}`}>
@@ -353,7 +420,10 @@ const CalendarPage = () => {
                         {hourEvents.map(evt => (
                           <motion.div key={evt.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
                             className="flex items-center justify-between rounded-lg px-3 py-1.5 group"
-                            style={{ background: "hsl(var(--primary) / 0.12)", borderLeft: "3px solid hsl(var(--primary))" }}>
+                            style={{
+                              background: evt.event_type === "task" ? "hsl(275 55% 55% / 0.12)" : evt.event_type === "reminder" ? "hsl(30 80% 55% / 0.12)" : "hsl(220 55% 55% / 0.12)",
+                              borderLeft: `3px solid ${evt.event_type === "task" ? "hsl(275 55% 55%)" : evt.event_type === "reminder" ? "hsl(30 80% 55%)" : "hsl(220 55% 55%)"}`,
+                            }}>
                             <div className="flex items-center gap-2 min-w-0">
                               <Clock className="w-3 h-3 text-primary shrink-0" />
                               <div className="min-w-0">

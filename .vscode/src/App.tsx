@@ -20,6 +20,7 @@ import PixelColoringPage from "./pages/PixelColoringPage";
 import PetGardenPage from "./pages/PetGardenPage";
 import GratitudeJarPage from "./pages/GratitudeJarPage";
 import TodayEventPopup from "./components/TodayEventPopup";
+import FloatingTimer from "./components/FloatingTimer";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           <TodayEventPopup />
+          <FloatingTimer />
           <BottomNav />
         </BrowserRouter>
       </AuthProvider>
