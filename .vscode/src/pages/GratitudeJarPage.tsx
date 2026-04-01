@@ -8,12 +8,14 @@ import { useToast } from "@/hooks/use-toast";
 
 function getJarMonth(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-function jarLabel(ym: string) {
+}function jarLabel(ym: string) {
   const [y, m] = ym.split("-");
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
-function todayISO() { return new Date().toISOString().split("T")[0]; }
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 interface Entry { id: string; content: string; entry_date: string; jar_month: string; }
 type View = "write" | "submit-anim" | "jars" | "jar-open";

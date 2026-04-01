@@ -4,20 +4,26 @@ import { Check, Trash2, Pencil, X, Save, Star, ChevronDown, ChevronUp, CalendarC
 import { Todo } from "@/lib/types";
 import { btsMembers } from "@/lib/bts-classifier";
 import MemberProfileCard from "@/components/MemberProfileCard";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface TodoItemProps {
   todo: Todo;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, text: string) => void;
+  onEditDueDate?: (id: string, dueDate: string | null) => void;
   showDetails?: boolean;
 }
 
-export default function TodoItem({ todo, onToggle, onDelete, onEdit, showDetails = false }: TodoItemProps) {
+export default function TodoItem({ todo, onToggle, onDelete, onEdit, onEditDueDate, showDetails = false }: TodoItemProps) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(todo.text);
   const [expanded, setExpanded] = useState(false);
   const [showMember, setShowMember] = useState(false);
+  const [editingDate, setEditingDate] = useState(false);
 
   const member = btsMembers.find((m) => m.name === todo.memberName) || btsMembers[0];
 
@@ -129,14 +135,48 @@ export default function TodoItem({ todo, onToggle, onDelete, onEdit, showDetails
           {!editing && (
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
-                onClick={() => {
-                  setEditText(todo.text);
-                  setEditing(true);
-                }}
+                onClick={() => { setEditText(todo.text); setEditing(true); }}
                 className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
+              {onEditDueDate && (
+                <Popover open={editingDate} onOpenChange={setEditingDate}>
+                  <PopoverTrigger asChild>
+                    <button className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
+                      <CalendarClock className="w-3.5 h-3.5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-popover border border-border rounded-xl shadow-lg z-50" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={todo.dueDate ? new Date(todo.dueDate + "T00:00:00") : undefined}
+                      onSelect={(date) => {
+                        onEditDueDate(todo.id, date ? format(date, "yyyy-MM-dd") : null);
+                        setEditingDate(false);
+                      }}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                    {todo.dueDate && (
+                      <div className="px-3 pb-3">
+                        <button type="button" onClick={() => { onEditDueDate(todo.id, null); setEditingDate(false); }}
+                          className="text-xs text-muted-foreground hover:text-foreground font-body">
+                          Clear date
+                        </button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              )}
+              {!todo.completed && (
+                <button
+                  onClick={() => onToggle(todo.id)}
+                  className="p-1.5 rounded-lg hover:bg-primary/10 transition-colors text-muted-foreground hover:text-primary"
+                  title="Mark done"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 onClick={() => onDelete(todo.id)}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"

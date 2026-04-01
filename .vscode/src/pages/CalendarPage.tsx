@@ -46,9 +46,15 @@ const CalendarPage = () => {
 
   // countdown
   const [showCountdown, setShowCountdown] = useState(false);
-  const [countdownEventId, setCountdownEventId] = useState<string | null>(null);
+  const [countdownEventId, setCountdownEventId] = useState<string | null>(() => localStorage.getItem("countdown-event-id"));
   const countdownEvent = events.find(e => e.id === countdownEventId) ?? null;
   const countdown = useCountdown(countdownEvent ? new Date(countdownEvent.event_date) : null);
+
+  const handleSetCountdown = (id: string) => {
+    setCountdownEventId(id || null);
+    if (id) localStorage.setItem("countdown-event-id", id);
+    else localStorage.removeItem("countdown-event-id");
+  };
 
   // day view scroll to current hour
   const dayScrollRef = useRef<HTMLDivElement>(null);
@@ -147,7 +153,7 @@ const CalendarPage = () => {
                 </div>
                 {/* Event picker */}
                 <select value={countdownEventId ?? ""}
-                  onChange={e => setCountdownEventId(e.target.value || null)}
+                  onChange={e => handleSetCountdown(e.target.value)}
                   className="w-full glass-input rounded-xl px-3 py-2 text-sm font-body text-foreground mb-3 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-transparent">
                   <option value="">Pick an event...</option>
                   {futureEvents.map(e => (

@@ -52,15 +52,47 @@ export function useTodos() {
     };
   }, [user]);
 
-  // Today's todos
+  // Today's todos — created today AND not scheduled for a future date
   const todayTodos = useMemo(
-    () => allTodos.filter((t) => isToday(t.createdAt)),
+    () => allTodos.filter((t) => {
+      if (!isToday(t.createdAt)) return false;
+      if (t.dueDate) {
+        const [y, m, d] = t.dueDate.split("-").map(Number);
+        const due = new Date(y, m - 1, d);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        if (due > today) return false; // scheduled for future, don't show today
+      }
+      return true;
+    }),
     [allTodos]
   );
 
-  // Past incomplete todos (tasks left undone)
+  // Past incomplete todos (tasks left undone from previous days, not future-scheduled)
   const undoneTodos = useMemo(
-    () => allTodos.filter((t) => !isToday(t.createdAt) && !t.completed),
+    () => allTodos.filter((t) => {
+      if (t.completed) return false;
+      if (isToday(t.createdAt)) return false;
+      if (t.dueDate) {
+        const [y, m, d] = t.dueDate.split("-").map(Number);
+        const due = new Date(y, m - 1, d);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        if (due >= today) return false; // upcoming, not undone
+      }
+      return true;
+    }),
+    [allTodos]
+  );
+
+  // Upcoming todos — future due date, not yet completed
+  const upcomingTodos = useMemo(
+    () => allTodos.filter((t) => {
+      if (t.completed) return false;
+      if (!t.dueDate) return false;
+      const [y, m, d] = t.dueDate.split("-").map(Number);
+      const due = new Date(y, m - 1, d);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      return due > today;
+    }).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!)),
     [allTodos]
   );
 
@@ -82,6 +114,15 @@ export function useTodos() {
     });
     return groups;
   }, [undoneTodos]);
+
+  const groupedUpcomingTodos = useMemo(() => {
+    const groups: Record<string, Todo[]> = {};
+    upcomingTodos.forEach((t) => {
+      if (!groups[t.category]) groups[t.category] = [];
+      groups[t.category].push(t);
+    });
+    return groups;
+  }, [upcomingTodos]);
 
   const addTodo = useCallback(
     async (text: string, category: TodoCategory, severity: number, dueDate?: string) => {
@@ -134,6 +175,14 @@ export function useTodos() {
     [user]
   );
 
+  const editTodoDueDate = useCallback(
+    async (id: string, dueDate: string | null) => {
+      if (!user) return;
+      await supabase.from("todos").update({ due_date: dueDate }).eq("id", id);
+    },
+    [user]
+  );
+
   const completedCount = todayTodos.filter((t) => t.completed).length;
   const totalCount = todayTodos.length;
   const undoneCount = undoneTodos.length;
@@ -144,11 +193,14 @@ export function useTodos() {
     groupedTodos,
     undoneTodos,
     groupedUndoneTodos,
+    upcomingTodos,
+    groupedUpcomingTodos,
     undoneCount,
     addTodo,
     toggleTodo,
     deleteTodo,
     editTodo,
+    editTodoDueDate,
     completedCount,
     totalCount,
   };

@@ -13,7 +13,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { CATEGORIES } from "@/lib/types";
 
 const Index = () => {
-  const { groupedTodos, addTodo, toggleTodo, deleteTodo, editTodo, completedCount, totalCount, undoneCount } = useTodos();
+  const { groupedTodos, addTodo, toggleTodo, deleteTodo, editTodo, editTodoDueDate, completedCount, totalCount, undoneCount } = useTodos();
   const { user } = useAuth();
   const navigate = useNavigate();
   useConfetti(completedCount, totalCount);
@@ -94,13 +94,8 @@ const Index = () => {
                 <div className="space-y-3 pl-2" style={{ borderLeft: `3px solid hsl(var(--${cat.color}) / 0.4)` }}>
                   <AnimatePresence mode="popLayout">
                     {groupedTodos[cat.value].map((todo) => (
-                      <TodoItem
-                        key={todo.id}
-                        todo={todo}
-                        onToggle={toggleTodo}
-                        onDelete={deleteTodo}
-                        onEdit={editTodo}
-                      />
+                      <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onDelete={deleteTodo}
+                        onEdit={editTodo} onEditDueDate={editTodoDueDate} />
                     ))}
                   </AnimatePresence>
                 </div>
