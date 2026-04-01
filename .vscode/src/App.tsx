@@ -22,6 +22,7 @@ import GratitudeJarPage from "./pages/GratitudeJarPage";
 import NotesPage from "./pages/NotesPage";
 import TodayEventPopup from "./components/TodayEventPopup";
 import FloatingTimer from "./components/FloatingTimer";
+import WalkingPet from "./components/WalkingPet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,7 @@ const App = () => (
           </Routes>
           <TodayEventPopup />
           <FloatingTimer />
+          <WalkingPet />
           <BottomNav />
         </BrowserRouter>
       </AuthProvider>
