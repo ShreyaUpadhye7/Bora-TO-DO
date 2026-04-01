@@ -19,6 +19,7 @@ import BtsGamePage from "./pages/BtsGamePage";
 import PixelColoringPage from "./pages/PixelColoringPage";
 import PetGardenPage from "./pages/PetGardenPage";
 import GratitudeJarPage from "./pages/GratitudeJarPage";
+import NotesPage from "./pages/NotesPage";
 import TodayEventPopup from "./components/TodayEventPopup";
 import FloatingTimer from "./components/FloatingTimer";
 import NotFound from "./pages/NotFound";
@@ -61,6 +62,7 @@ const App = () => (
             <Route path="/pixel-art" element={<ProtectedRoute><PixelColoringPage /></ProtectedRoute>} />
             <Route path="/pet" element={<ProtectedRoute><PetGardenPage /></ProtectedRoute>} />
             <Route path="/gratitude" element={<ProtectedRoute><GratitudeJarPage /></ProtectedRoute>} />
+            <Route path="/notes" element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <TodayEventPopup />

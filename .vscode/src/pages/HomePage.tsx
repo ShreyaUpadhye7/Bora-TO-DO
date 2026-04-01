@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckSquare, BookOpen, Timer, Sparkles, CalendarDays, KeyRound, Gamepad2, Palette, PawPrint, Heart } from "lucide-react";
+import { CheckSquare, BookOpen, Timer, Sparkles, CalendarDays, KeyRound, Gamepad2, Palette, PawPrint, Heart, NotebookPen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTodos } from "@/hooks/useTodos";
@@ -69,6 +69,13 @@ const navCards = [
     icon: KeyRound,
     path: "/magic-shop",
     emoji: "🗝️",
+  },
+  {
+    title: "Notes",
+    description: "Your thoughts, organized",
+    icon: NotebookPen,
+    path: "/notes",
+    emoji: "📝",
   },
 ];
 
