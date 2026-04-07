@@ -10,38 +10,118 @@ const S = 5; // pixel cell size
 const PW = 8 * S; // pet width ~40px
 const PH = 8 * S; // pet height ~40px
 const GRAV = 0.6;
-const JUMP = -11;
 const SPEED = 1.8;
 const ANGRY_R = 90;
+const CLIMB_HEIGHT = 22;
+const CLIMB_SPEED = 3.2;
+const MAX_FALL_SPEED = 12;
 
-// Scan visible glass-card elements as platforms (viewport coords)
-function scanPlatforms() {
-  const out = [];
-  document.querySelectorAll(".glass-card, .glass-nav").forEach(el => {
+type SolidBox = { x: number; y: number; w: number; h: number; floor?: boolean };
+
+const SOLID_SELECTOR = [
+  ".glass-card",
+  ".glass-nav",
+  "button",
+  "a[href]",
+  "input",
+  "textarea",
+  "select",
+  "[role='button']",
+  "[role='dialog']",
+  "[data-radix-popper-content-wrapper]",
+].join(", ");
+
+// Scan visible app UI as solid boxes (viewport coords)
+function scanSolids(): SolidBox[] {
+  const out: SolidBox[] = [];
+  document.querySelectorAll(SOLID_SELECTOR).forEach((el) => {
+    if (!(el instanceof HTMLElement) || el.closest("[data-walking-pet]")) return;
     const r = el.getBoundingClientRect();
-    // Only include if top edge is visible on screen
-    if (r.width > 40 && r.height > 24 && r.top > -4 && r.top < window.innerHeight - 10) {
+    const style = window.getComputedStyle(el);
+    if (
+      style.visibility === "hidden" ||
+      style.display === "none" ||
+      r.width < 34 ||
+      r.height < 18 ||
+      r.bottom < 0 ||
+      r.top > window.innerHeight ||
+      r.right < 0 ||
+      r.left > window.innerWidth
+    ) {
+      return;
+    }
+
+    // Avoid duplicate nested controls making the pet bounce inside the same card.
+    const duplicate = out.some((p) =>
+      Math.abs(p.x - r.left) < 3 &&
+      Math.abs(p.y - r.top) < 3 &&
+      Math.abs(p.w - r.width) < 3 &&
+      Math.abs(p.h - r.height) < 3
+    );
+    if (!duplicate) {
       out.push({ x: r.left, y: r.top, w: r.width, h: r.height });
     }
   });
   // Screen floor
-  out.push({ x: 0, y: window.innerHeight - 4, w: window.innerWidth, h: 4 });
+  out.push({ x: 0, y: window.innerHeight - 4, w: window.innerWidth, h: 4, floor: true });
   return out;
 }
 
-// Find the nearest platform surface below the pet's feet
-function groundBelow(px, py, plats) {
-  const cx = px + PW / 2;
-  const feet = py + PH;
-  let best = null;
-  for (const p of plats) {
-    if (cx >= p.x + 4 && cx <= p.x + p.w - 4) {
-      if (p.y >= feet - 6) { // platform top is at or below feet
-        if (best === null || p.y < best) best = p.y;
-      }
+function overlaps(a1: number, a2: number, b1: number, b2: number) {
+  return a1 < b2 && a2 > b1;
+}
+
+function intersectsBox(x: number, y: number, box: SolidBox) {
+  return x < box.x + box.w && x + PW > box.x && y < box.y + box.h && y + PH > box.y;
+}
+
+function findWall(x: number, y: number, solids: SolidBox[]) {
+  return solids.find((box) => !box.floor && intersectsBox(x, y, box)) ?? null;
+}
+
+function findStepUp(x: number, y: number, dx: number, solids: SolidBox[]) {
+  const foot = y + PH;
+  const frontX = dx > 0 ? x + PW + 2 : x - 2;
+
+  for (const box of solids) {
+    if (box.floor) continue;
+    const hitsFront = dx > 0
+      ? frontX >= box.x && frontX <= box.x + Math.min(18, box.w)
+      : frontX <= box.x + box.w && frontX >= box.x + Math.max(box.w - 18, 0);
+
+    if (!hitsFront) continue;
+    if (!overlaps(y + 6, foot - 3, box.y, box.y + box.h)) continue;
+
+    const climb = foot - box.y;
+    if (climb >= 0 && climb <= CLIMB_HEIGHT) {
+      return box.y - PH;
     }
   }
-  return best;
+
+  return null;
+}
+
+function findLanding(x: number, prevY: number, nextY: number, solids: SolidBox[]) {
+  const prevFoot = prevY + PH;
+  const nextFoot = nextY + PH;
+  let landing: SolidBox | null = null;
+
+  for (const box of solids) {
+    if (!overlaps(x + 6, x + PW - 6, box.x + 4, box.x + box.w - 4)) continue;
+    if (prevFoot <= box.y + 4 && nextFoot >= box.y) {
+      if (!landing || box.y < landing.y) landing = box;
+    }
+  }
+
+  return landing;
+}
+
+function hasGround(x: number, y: number, solids: SolidBox[]) {
+  const foot = y + PH;
+  return solids.some((box) =>
+    overlaps(x + 6, x + PW - 6, box.x + 4, box.x + box.w - 4) &&
+    Math.abs(foot - box.y) < 5
+  );
 }
 
 function PixelMini({ pixels, size, flipX }) {
@@ -77,10 +157,9 @@ export default function WalkingPet() {
   const vx = useRef(SPEED); const vy = useRef(0);
   const grounded = useRef(false);
   const angry = useRef(false);
-  const plats = useRef([]);
+  const solids = useRef<SolidBox[]>([]);
   const cursor = useRef({ x: -999, y: -999 });
   const raf = useRef(null);
-  const jumpCd = useRef(0);
   const angryTimer = useRef(null);
   const scanTimer = useRef(null);
 
@@ -100,8 +179,8 @@ export default function WalkingPet() {
     return () => { window.removeEventListener("mousemove", mc); window.removeEventListener("touchmove", mt); };
   }, []);
 
-  // Rescan platforms on scroll, resize, route change
-  const rescan = useCallback(() => { plats.current = scanPlatforms(); }, []);
+  // Rescan solid UI boxes on scroll, resize, route change
+  const rescan = useCallback(() => { solids.current = scanSolids(); }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -136,18 +215,51 @@ export default function WalkingPet() {
 
     if (!angry.current) {
       // Gravity
-      dvy += GRAV;
-      y += dvy;
-      x += dvx;
+      dvy = Math.min(MAX_FALL_SPEED, dvy + GRAV);
 
-      // Platform collision
-      const gy = groundBelow(x, y, plats.current);
-      if (gy !== null && y + PH >= gy && dvy >= 0) {
-        y = gy - PH;
+      // Horizontal movement: climb short obstacles, otherwise treat them as walls.
+      let nextX = x + dvx;
+      const stepY = g ? findStepUp(nextX, y, dvx, solids.current) : null;
+      if (stepY !== null) {
+        x = nextX;
+        y = stepY;
         dvy = 0;
         g = true;
       } else {
-        g = false;
+        let climbedWall = false;
+        const wall = findWall(nextX, y, solids.current);
+        if (wall) {
+          const targetY = wall.y - PH;
+          if (targetY < y) {
+            y = Math.max(targetY, y - CLIMB_SPEED);
+            dvy = 0;
+            g = true;
+            climbedWall = true;
+          } else {
+            dvx = -dvx;
+          }
+        } else {
+          x = nextX;
+        }
+
+        if (!climbedWall) {
+          // Vertical movement: land on UI boxes, fall when no ground is below.
+          const prevY = y;
+          const nextY = y + dvy;
+          const landing = dvy >= 0 ? findLanding(x, prevY, nextY, solids.current) : null;
+          if (landing) {
+            y = landing.y - PH;
+            dvy = 0;
+            g = true;
+          } else {
+            y = nextY;
+            g = false;
+          }
+
+          if (g && !hasGround(x, y, solids.current)) {
+            g = false;
+          }
+        }
       }
 
       // Screen bounds
@@ -155,29 +267,6 @@ export default function WalkingPet() {
       if (x + PW > W) { x = W - PW; dvx = -Math.abs(dvx); }
       if (y + PH > H) { y = H - PH; dvy = 0; g = true; }
       if (y < 0) { y = 0; dvy = Math.abs(dvy) * 0.3; }
-
-      // Jump logic
-      jumpCd.current = Math.max(0, jumpCd.current - 1);
-      if (g && jumpCd.current === 0) {
-        const cx = x + PW / 2;
-        // Current platform
-        const cur = plats.current.find(p =>
-          cx >= p.x + 4 && cx <= p.x + p.w - 4 && Math.abs((y + PH) - p.y) < 8
-        );
-        // Will pet walk off edge in next ~20 frames?
-        const nextCx = cx + dvx * 20;
-        const fallOff = cur && (nextCx < cur.x + 4 || nextCx > cur.x + cur.w - 4);
-        // Is there a higher platform nearby to jump to?
-        const higher = plats.current.find(p =>
-          p.y < y + PH - 15 &&
-          Math.abs((p.x + p.w / 2) - cx) < 150
-        );
-        if (fallOff || higher || Math.random() < 0.004) {
-          dvy = JUMP;
-          g = false;
-          jumpCd.current = 50;
-        }
-      }
     }
 
     px.current = x; py.current = y;
@@ -198,7 +287,7 @@ export default function WalkingPet() {
     return () => { if (raf.current) cancelAnimationFrame(raf.current); };
   }, [enabled, petData, tick]);
 
-  const hide = ["/pet", "/auth"].includes(loc.pathname);
+  const hide = ["/auth"].includes(loc.pathname);
   const petType = PET_TYPES.find(p => p.id === petData?.pet_type);
   const stage = petType ? getPetStage(petType, Math.max(0, (petData?.level || 1) - 1)) : null;
   const pixels = stage?.pixels ?? petType?.stages[0]?.pixels;
@@ -207,6 +296,7 @@ export default function WalkingPet() {
     <>
       {/* Toggle */}
       <motion.button
+        data-walking-pet
         whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
         onClick={() => { const n = !enabled; setEnabled(n); localStorage.setItem(STORAGE_KEY, String(n)); }}
         className="fixed bottom-24 left-4 z-40 glass-card rounded-2xl px-3 py-2 flex items-center gap-1.5 text-xs font-body text-muted-foreground hover:text-foreground transition-colors"
@@ -219,6 +309,7 @@ export default function WalkingPet() {
       {/* Pet */}
       {enabled && !hide && petData && pixels && (
         <div
+          data-walking-pet
           className="fixed z-30 pointer-events-none select-none"
           style={{ left: view.x, top: view.y, willChange: "left, top" }}
         >
