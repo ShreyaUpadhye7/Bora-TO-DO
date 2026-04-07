@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/client";
@@ -160,7 +160,6 @@ export default function WalkingPet() {
   const solids = useRef<SolidBox[]>([]);
   const cursor = useRef({ x: -999, y: -999 });
   const raf = useRef(null);
-  const angryTimer = useRef(null);
   const scanTimer = useRef(null);
 
   // Load pet
@@ -174,9 +173,18 @@ export default function WalkingPet() {
   useEffect(() => {
     const mc = (e) => { cursor.current = { x: e.clientX, y: e.clientY }; };
     const mt = (e) => { if (e.touches[0]) cursor.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
+    const onLeave = () => { cursor.current = { x: -999, y: -999 }; };
+
+    window.addEventListener("pointermove", mc);
     window.addEventListener("mousemove", mc);
     window.addEventListener("touchmove", mt, { passive: true });
-    return () => { window.removeEventListener("mousemove", mc); window.removeEventListener("touchmove", mt); };
+    window.addEventListener("mouseleave", onLeave);
+    return () => {
+      window.removeEventListener("pointermove", mc);
+      window.removeEventListener("mousemove", mc);
+      window.removeEventListener("touchmove", mt);
+      window.removeEventListener("mouseleave", onLeave);
+    };
   }, []);
 
   // Rescan solid UI boxes on scroll, resize, route change
@@ -207,10 +215,8 @@ export default function WalkingPet() {
     const d = Math.hypot(cursor.current.x - (x + PW / 2), cursor.current.y - (y + PH / 2));
     if (d < ANGRY_R && !angry.current) {
       angry.current = true;
-      clearTimeout(angryTimer.current);
     } else if (d >= ANGRY_R && angry.current) {
-      clearTimeout(angryTimer.current);
-      angryTimer.current = setTimeout(() => { angry.current = false; }, 800);
+      angry.current = false;
     }
 
     if (!angry.current) {
